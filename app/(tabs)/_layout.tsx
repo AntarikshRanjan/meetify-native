@@ -1,10 +1,9 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Animated, Platform, useWindowDimensions } from 'react-native';
-import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import React from 'react';
 
-// Simple icon component without emojis
+// Simple icon component without complex animations
 function TabIconSymbol({ name, focused }: { name: string; focused: boolean }) {
-    // Using simple text-based icons
     const getIcon = () => {
         switch (name) {
             case 'explore':
@@ -18,44 +17,11 @@ function TabIconSymbol({ name, focused }: { name: string; focused: boolean }) {
         }
     };
 
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-    const opacityAnim = useRef(new Animated.Value(focused ? 1 : 0)).current;
-    const bgOpacityAnim = useRef(new Animated.Value(focused ? 1 : 0)).current;
-
-    useEffect(() => {
-        Animated.parallel([
-            Animated.spring(scaleAnim, {
-                toValue: focused ? 1 : 0.9,
-                friction: 8,
-                tension: 120,
-                useNativeDriver: true,
-            }),
-            Animated.timing(opacityAnim, {
-                toValue: focused ? 1 : 0,
-                duration: 180,
-                useNativeDriver: true,
-            }),
-            Animated.timing(bgOpacityAnim, {
-                toValue: focused ? 1 : 0,
-                duration: 180,
-                useNativeDriver: false,
-            }),
-        ]).start();
-    }, [focused]);
-
-    const backgroundColor = bgOpacityAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['transparent', 'rgba(59, 130, 246, 0.2)'],
-    });
-
     return (
-        <Animated.View
+        <View
             style={[
                 styles.tabIcon,
-                {
-                    transform: [{ scale: scaleAnim }],
-                    backgroundColor,
-                },
+                focused && styles.tabIconFocused,
             ]}
         >
             <Text style={[
@@ -64,15 +30,12 @@ function TabIconSymbol({ name, focused }: { name: string; focused: boolean }) {
             ]}>
                 {getIcon()}
             </Text>
-            <Animated.Text
-                style={[
-                    styles.tabLabel,
-                    { opacity: opacityAnim }
-                ]}
-            >
-                {name}
-            </Animated.Text>
-        </Animated.View>
+            {focused && (
+                <Text style={styles.tabLabel}>
+                    {name}
+                </Text>
+            )}
+        </View>
     );
 }
 
@@ -96,10 +59,6 @@ export default function TabLayout() {
                 tabBarActiveTintColor: '#3B82F6',
                 tabBarInactiveTintColor: '#6B7280',
                 tabBarShowLabel: false,
-                // Smooth tab transition
-                ...(Platform.OS === 'web' ? {
-                    // Add CSS transition for web
-                } : {}),
             }}
         >
             <Tabs.Screen
@@ -129,7 +88,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 20,
         height: 56,
-        backgroundColor: 'rgba(18, 18, 22, 0.85)',
+        backgroundColor: 'rgba(18, 18, 22, 0.95)',
         borderRadius: 28,
         borderTopWidth: 0,
         paddingBottom: 0,
@@ -143,7 +102,6 @@ const styles = StyleSheet.create({
         ...(Platform.OS === 'web' ? {
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            transition: 'all 0.3s ease',
         } : {}),
     },
     tabIcon: {
@@ -153,9 +111,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 20,
-        ...(Platform.OS === 'web' ? {
-            transition: 'all 0.2s ease',
-        } : {}),
+        backgroundColor: 'transparent',
+    },
+    tabIconFocused: {
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
     },
     iconSymbol: {
         fontSize: 18,

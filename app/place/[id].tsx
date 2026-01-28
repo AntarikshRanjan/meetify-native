@@ -64,9 +64,9 @@ export default function PlaceScreen() {
                         <View key={plan.id} style={styles.planCard}>
                             <Text style={styles.planTitle}>{plan.title}</Text>
                             <View style={styles.planDetails}>
-                                <Text style={styles.planTime}>🕐 {plan.time}</Text>
+                                <Text style={styles.planTime}>{plan.time}</Text>
                                 <Text style={styles.planPeople}>
-                                    👥 {plan.currentPeople}/{plan.maxPeople}
+                                    {plan.currentPeople}/{plan.maxPeople} people
                                 </Text>
                             </View>
                         </View>

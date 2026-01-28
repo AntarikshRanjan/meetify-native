@@ -3,27 +3,17 @@ import {
     View,
     StyleSheet,
     Text,
+    Platform,
     TouchableOpacity,
     TextInput,
     Animated,
     Pressable,
     Dimensions
 } from 'react-native';
-import MapView, { Marker, Circle } from 'react-native-maps';
 import { useAppState } from '../../context/AppContext';
 import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Dark map style for native (Google Maps)
-const darkMapStyle = [
-    { elementType: 'geometry', stylers: [{ color: '#1d1d1d' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2c2c2c' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }] },
-    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-];
 
 // Menu options
 const menuItems = [
@@ -76,19 +66,16 @@ function SlideMenu({ visible, onClose }: { visible: boolean; onClose: () => void
 
     return (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-            {/* Backdrop */}
             <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
                 <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
             </Animated.View>
 
-            {/* Menu */}
             <Animated.View
                 style={[
                     styles.menuContainer,
                     { transform: [{ translateX: slideAnim }] },
                 ]}
             >
-                {/* Menu Header */}
                 <View style={styles.menuHeader}>
                     <View style={styles.userAvatar}>
                         <Text style={styles.avatarText}>M</Text>
@@ -97,7 +84,6 @@ function SlideMenu({ visible, onClose }: { visible: boolean; onClose: () => void
                     <Text style={styles.menuSubtitle}>Meetify User</Text>
                 </View>
 
-                {/* Menu Items */}
                 <View style={styles.menuItems}>
                     {menuItems.map((item) => (
                         <TouchableOpacity
@@ -118,7 +104,6 @@ function SlideMenu({ visible, onClose }: { visible: boolean; onClose: () => void
                     ))}
                 </View>
 
-                {/* Menu Footer */}
                 <View style={styles.menuFooter}>
                     <TouchableOpacity style={styles.logoutButton} onPress={onClose}>
                         <Text style={styles.logoutIcon}>→</Text>
@@ -127,6 +112,94 @@ function SlideMenu({ visible, onClose }: { visible: boolean; onClose: () => void
                     <Text style={styles.versionText}>Meetify v1.0.0</Text>
                 </View>
             </Animated.View>
+        </View>
+    );
+}
+
+// Leaflet Map Component for Web
+function WebMapView({ places, onMarkerPress, getColor }: any) {
+    const [MapComponents, setMapComponents] = useState<any>(null);
+
+    useEffect(() => {
+        // Inject Leaflet CSS
+        if (typeof document !== 'undefined') {
+            const linkId = 'leaflet-css';
+            if (!document.getElementById(linkId)) {
+                const link = document.createElement('link');
+                link.id = linkId;
+                link.rel = 'stylesheet';
+                link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+                document.head.appendChild(link);
+            }
+        }
+
+        // Dynamic import for react-leaflet
+        Promise.all([
+            import('react-leaflet'),
+            import('leaflet'),
+        ]).then(([reactLeaflet, L]) => {
+            delete (L.Icon.Default.prototype as any)._getIconUrl;
+            L.Icon.Default.mergeOptions({
+                iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            });
+            setMapComponents({ ...reactLeaflet, L });
+        });
+    }, []);
+
+    if (!MapComponents) {
+        return (
+            <View style={styles.mapLoading}>
+                <Text style={styles.loadingText}>Loading map...</Text>
+            </View>
+        );
+    }
+
+    const { MapContainer, TileLayer, CircleMarker, Popup } = MapComponents;
+
+    return (
+        <View style={styles.webMapContainer}>
+            <MapContainer
+                center={[12.9716, 77.5946]}
+                zoom={14}
+                style={{ width: '100%', height: '100%' }}
+                zoomControl={false}
+            >
+                <TileLayer
+                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                />
+
+                {places.map((place: any) => (
+                    <CircleMarker
+                        key={place.id}
+                        center={[place.latitude, place.longitude]}
+                        radius={20}
+                        pathOptions={{
+                            color: getColor(place.activeCount),
+                            fillColor: getColor(place.activeCount),
+                            fillOpacity: 0.8,
+                            weight: 3,
+                        }}
+                        eventHandlers={{
+                            click: () => onMarkerPress(place.id),
+                        }}
+                    >
+                        <Popup>
+                            <div style={{ color: '#333', minWidth: 150 }}>
+                                <strong>{place.name}</strong>
+                                <br />
+                                <span style={{ color: '#666' }}>{place.category}</span>
+                                <br />
+                                <span style={{ color: getColor(place.activeCount) }}>
+                                    {place.activeCount} active
+                                </span>
+                            </div>
+                        </Popup>
+                    </CircleMarker>
+                ))}
+            </MapContainer>
         </View>
     );
 }
@@ -154,37 +227,11 @@ export default function ExploreScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Native Map */}
-            <MapView
-                style={styles.map}
-                initialRegion={{
-                    latitude: 12.9716,
-                    longitude: 77.5946,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
-                }}
-                customMapStyle={darkMapStyle}
-            >
-                {filteredPlaces.map((place) => (
-                    <React.Fragment key={place.id}>
-                        <Circle
-                            center={{ latitude: place.latitude, longitude: place.longitude }}
-                            radius={200}
-                            fillColor={`${getColor(place.activeCount)}30`}
-                            strokeColor={getColor(place.activeCount)}
-                            strokeWidth={2}
-                        />
-                        <Marker
-                            coordinate={{ latitude: place.latitude, longitude: place.longitude }}
-                            onPress={() => handleMarkerPress(place.id)}
-                        >
-                            <View style={[styles.marker, { backgroundColor: getColor(place.activeCount) }]}>
-                                <Text style={styles.markerText}>{place.activeCount}</Text>
-                            </View>
-                        </Marker>
-                    </React.Fragment>
-                ))}
-            </MapView>
+            <WebMapView
+                places={filteredPlaces}
+                onMarkerPress={handleMarkerPress}
+                getColor={getColor}
+            />
 
             {/* Glass Header Overlay */}
             <View style={styles.headerOverlay}>
@@ -239,22 +286,20 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#0a0a0a',
     },
-    map: {
+    webMapContainer: {
         flex: 1,
+        width: '100%',
+        height: '100%',
     },
-    marker: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+    mapLoading: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 3,
-        borderColor: 'white',
+        backgroundColor: '#0a0a0a',
     },
-    markerText: {
-        color: 'white',
-        fontSize: 12,
-        fontWeight: 'bold',
+    loadingText: {
+        color: '#6B7280',
+        fontSize: 16,
     },
     headerOverlay: {
         position: 'absolute',
@@ -269,12 +314,13 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(20, 20, 25, 0.9)',
+        backgroundColor: 'rgba(20, 20, 25, 0.85)',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
+        backdropFilter: 'blur(10px)',
+    } as any,
     menuButtonText: {
         color: 'white',
         fontSize: 18,
@@ -283,13 +329,14 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(20, 20, 25, 0.9)',
+        backgroundColor: 'rgba(20, 20, 25, 0.85)',
         borderRadius: 22,
         paddingHorizontal: 16,
         height: 44,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
+        backdropFilter: 'blur(10px)',
+    } as any,
     searchIcon: {
         color: '#6B7280',
         fontSize: 14,
@@ -299,7 +346,8 @@ const styles = StyleSheet.create({
         flex: 1,
         color: 'white',
         fontSize: 15,
-    },
+        outlineStyle: 'none',
+    } as any,
     clearIcon: {
         color: '#6B7280',
         fontSize: 14,
@@ -309,13 +357,14 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 100,
         right: 16,
-        backgroundColor: 'rgba(20, 20, 25, 0.9)',
+        backgroundColor: 'rgba(20, 20, 25, 0.85)',
         borderRadius: 12,
         padding: 12,
         gap: 8,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
+        backdropFilter: 'blur(10px)',
+    } as any,
     legendItem: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -342,10 +391,11 @@ const styles = StyleSheet.create({
         bottom: 0,
         width: SCREEN_WIDTH * 0.8,
         maxWidth: 320,
-        backgroundColor: 'rgba(17, 17, 17, 0.98)',
+        backgroundColor: 'rgba(17, 17, 17, 0.95)',
         borderRightWidth: 1,
         borderRightColor: 'rgba(59, 130, 246, 0.2)',
-    },
+        backdropFilter: 'blur(20px)',
+    } as any,
     menuHeader: {
         paddingTop: 60,
         paddingHorizontal: 24,
